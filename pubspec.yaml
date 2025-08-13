@@ -1,0 +1,43 @@
+name: chatapp_flutter
+description: Chat application with face recognition authentication
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  camera: ^0.10.5+2
+  cryptography: ^2.7.0
+  cupertino_icons: ^1.0.2
+  flutter:
+    sdk: flutter
+  get: ^4.6.5
+  get_storage: ^2.1.1
+  google_mlkit_face_detection: ^0.13.1
+  http: ^1.1.0
+  image: ^4.0.17
+  image_picker: ^1.0.2
+  path: ^1.8.3
+  permission_handler: ^12.0.1
+  socket_io_client: ^2.0.3+1
+
+dev_dependencies:
+  flutter_lints: ^2.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  # Assets
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/
+  # Fonts (optional)
+  # fonts:
+  #   - family: Roboto
+  #     fonts:
+  #       - asset: fonts/Roboto-Regular.ttf
+  #       - asset: fonts/Roboto-Bold.ttf
+  #         weight: 700
