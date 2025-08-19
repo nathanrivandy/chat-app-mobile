@@ -17,7 +17,7 @@ class ChatController extends GetxController {
 
   // Users & contacts
   RxList<User> users = <User>[].obs;
-  RxList<User> allUsers = <User>[].obs; // ⬅️ Added: For storing all users data
+  RxList<User> allUsers = <User>[].obs;
   RxBool isLoading = false.obs;
 
   RxList<User> addedContacts = <User>[].obs;
@@ -45,9 +45,9 @@ class ChatController extends GetxController {
   final AesGcm _aes = AesGcm.with256bits();
   final Random _rng = Random.secure();
 
-  SimpleKeyPair? _myKeyPair; // private+public (local)
-  final Map<int, SimplePublicKey> _peerPublicKeys = {}; // cache pubkey lawan
-  final Map<int, SecretKey> _dmKeys = {}; // ⬅️ cache session key per user
+  SimpleKeyPair? _myKeyPair;
+  final Map<int, SimplePublicKey> _peerPublicKeys = {};
+  final Map<int, SecretKey> _dmKeys = {};
 
   // --------- E2EE helpers ----------
   Future<void> _ensureMyKeyPair() async {
@@ -82,7 +82,6 @@ class ChatController extends GetxController {
     }
   }
 
-  /// Pastikan keypair ada & public key selalu ter-upload (kalau server hilang data).
   Future<void> ensureE2EEReady() async {
     await _ensureMyKeyPair();
     final pubB64 = _box.read('e2ee_pub') as String?;
@@ -110,7 +109,6 @@ class ChatController extends GetxController {
   List<int> _randBytes(int n) =>
       List<int>.generate(n, (_) => _rng.nextInt(256));
 
-  /// Derive & cache session key untuk DM dgn user tertentu (hemat CPU).
   Future<SecretKey> _getDmKey(int peerUserId) async {
     final existing = _dmKeys[peerUserId];
     if (existing != null) return existing;
@@ -126,7 +124,7 @@ class ChatController extends GetxController {
     final sharedBytes = await shared.extractBytes();
     final info = utf8.encode('chatapp:e2ee:v1');
     final digest = await Sha256().hash([...sharedBytes, ...info]);
-    final key = SecretKey(digest.bytes); // 32 bytes AES-256
+    final key = SecretKey(digest.bytes);
 
     _dmKeys[peerUserId] = key;
     return key;
@@ -134,7 +132,7 @@ class ChatController extends GetxController {
 
   Future<String> _encryptForUser(String plaintext, int peerUserId) async {
     final key = await _getDmKey(peerUserId);
-    final nonce = _randBytes(12); // 96-bit nonce AES-GCM
+    final nonce = _randBytes(12);
     final box = await _aes.encrypt(
       utf8.encode(plaintext),
       secretKey: key,
@@ -147,7 +145,7 @@ class ChatController extends GetxController {
     if (enc == null) return null;
     if (!enc.startsWith('enc:v1:')) return enc;
 
-    final parts = enc.split(':'); // enc:v1:aesgcm:nonce:ct:mac
+    final parts = enc.split(':');
     if (parts.length != 6 || parts[2] != 'aesgcm') return enc;
 
     final nonce = base64Decode(parts[3]);
@@ -171,15 +169,14 @@ class ChatController extends GetxController {
   }
 
   // =========================
-  // ⬅️ NEW: Home Screen Support Methods
+  // Home Screen Support Methods
   // =========================
 
-  /// Load all users to populate allUsers list (needed for home screen)
   Future<void> loadAllUsers() async {
     try {
       print('DEBUG: Loading all users...');
+      isLoading.value = true;
 
-      // Try the new endpoint first
       try {
         final response = await _apiService.getAllUsers();
         if (response['users'] != null) {
@@ -192,32 +189,29 @@ class ChatController extends GetxController {
         print('DEBUG: /api/users/all endpoint failed: $e');
       }
 
-      // Fallback to regular users endpoint
       try {
         final response = await _apiService.getUsers();
         if (response['users'] != null) {
           allUsers.value =
               (response['users'] as List).map((u) => User.fromJson(u)).toList();
-          print(
-              'DEBUG: Loaded ${allUsers.length} users from /api/users fallback');
+          print('DEBUG: Loaded ${allUsers.length} users from /api/users fallback');
           return;
         }
       } catch (e) {
         print('DEBUG: /api/users fallback failed: $e');
       }
 
-      // Last resort: use contacts
       await loadAddedContacts();
       allUsers.value = addedContacts.toList();
       print('DEBUG: Using ${allUsers.length} users from contacts as fallback');
     } catch (e) {
       print('DEBUG: Error in loadAllUsers: $e');
-      // Make sure we have some users for the UI
       allUsers.value = addedContacts.toList();
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  /// Load all messages for home screen (to show chat history)
   Future<void> loadAllMessages() async {
     try {
       print('DEBUG: Loading all messages...');
@@ -226,19 +220,15 @@ class ChatController extends GetxController {
       final currentUserId = _authController.currentUser.value?.id;
       if (currentUserId == null) {
         print('DEBUG: currentUserId is null, cannot load messages');
-        isLoading.value = false;
         return;
       }
 
-      // Try the new endpoint first
       try {
         final response = await _apiService.getAllMessages();
         if (response['messages'] != null) {
           final rawMessages = response['messages'] as List;
-          print(
-              'DEBUG: Got ${rawMessages.length} messages from /api/messages/all');
+          print('DEBUG: Got ${rawMessages.length} messages from /api/messages/all');
 
-          // Process and decrypt messages
           final processedMessages =
               await _processMessages(rawMessages, currentUserId);
           messages.value = processedMessages;
@@ -249,29 +239,23 @@ class ChatController extends GetxController {
         print('DEBUG: /api/messages/all endpoint failed: $e');
       }
 
-      // Fallback: load messages for each contact individually
       print('DEBUG: Trying fallback method - loading messages per contact');
       List<Message> allMessages = [];
 
       for (var contact in addedContacts) {
         try {
-          final response =
-              await _apiService.getMessages(receiverId: contact.id);
+          final response = await _apiService.getMessages(receiverId: contact.id);
           if (response['messages'] != null) {
             final contactMessages = response['messages'] as List;
-            final processed =
-                await _processMessages(contactMessages, currentUserId);
+            final processed = await _processMessages(contactMessages, currentUserId);
             allMessages.addAll(processed);
-            print(
-                'DEBUG: Loaded ${processed.length} messages for contact ${contact.fullName}');
+            print('DEBUG: Loaded ${processed.length} messages for contact ${contact.fullName}');
           }
         } catch (e) {
-          print(
-              'DEBUG: Failed to load messages for contact ${contact.fullName}: $e');
+          print('DEBUG: Failed to load messages for contact ${contact.fullName}: $e');
         }
       }
 
-      // Sort by timestamp
       allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       messages.value = allMessages;
       print('DEBUG: Fallback method loaded ${messages.length} total messages');
@@ -282,7 +266,6 @@ class ChatController extends GetxController {
     }
   }
 
-  /// Process and decrypt messages
   Future<List<Message>> _processMessages(
       List<dynamic> rawMessages, int currentUserId) async {
     final futures = rawMessages.map((m) async {
@@ -292,7 +275,6 @@ class ChatController extends GetxController {
         final receiverId = raw['receiver_id'] as int?;
         final channelId = raw['channel_id'] as int?;
 
-        // Only decrypt DM messages (not channel messages)
         if (channelId == null && senderId != null && receiverId != null) {
           final peerId = senderId == currentUserId ? receiverId : senderId;
           try {
@@ -307,7 +289,6 @@ class ChatController extends GetxController {
         return Message.fromJson(raw);
       } catch (e) {
         print('DEBUG: Failed to process message: $e');
-        // Return a dummy message to prevent crashes
         return Message(
           id: 0,
           senderId: 0,
@@ -319,39 +300,48 @@ class ChatController extends GetxController {
     }).toList();
 
     final processedMessages = await Future.wait(futures);
-
-    // Filter out dummy messages
     return processedMessages.where((msg) => msg.id != 0).toList();
   }
 
-  /// Mark messages as read with better error handling
+  // ⭐ FIXED: Mark messages as read - menggunakan overload yang benar
   Future<void> markMessagesAsRead(int userId) async {
     try {
-      // Try the new endpoint first
-      try {
-        await _apiService.markMessagesAsRead(userId);
-        print('DEBUG: Marked messages as read for user $userId');
-      } catch (e) {
-        print('DEBUG: markMessagesAsRead endpoint failed: $e');
-        // Continue with local update anyway
-      }
+      final currentUserId = _authController.currentUser.value?.id;
+      if (currentUserId == null) return;
 
-      // Update local messages to mark as read
-      bool hasUpdates = false;
-      for (var i = 0; i < messages.length; i++) {
-        final msg = messages[i];
-        if (msg.senderId == userId &&
-            msg.receiverId == _authController.currentUser.value?.id &&
-            !msg.isRead) {
-          messages[i] = msg.copyWith(isRead: true);
-          hasUpdates = true;
+      // Cari semua unread messages dari user tersebut
+      final unreadMessageIds = messages
+          .where((msg) =>
+              msg.senderId == userId &&
+              msg.receiverId == currentUserId &&
+              !msg.isRead &&
+              msg.id != null)
+          .map((msg) => msg.id!)
+          .toList();
+
+      if (unreadMessageIds.isNotEmpty) {
+        try {
+          // ⭐ FIXED: Gunakan overload yang menerima List<int>
+          await _apiService.markMessagesAsRead(unreadMessageIds);
+          print('DEBUG: Marked ${unreadMessageIds.length} messages as read for user $userId');
+        } catch (e) {
+          print('DEBUG: markMessagesAsRead API call failed: $e');
         }
-      }
 
-      if (hasUpdates) {
-        messages.refresh();
-        print(
-            'DEBUG: Updated local read status for messages from user $userId');
+        // Update local messages
+        bool hasUpdates = false;
+        for (var i = 0; i < messages.length; i++) {
+          final msg = messages[i];
+          if (unreadMessageIds.contains(msg.id)) {
+            messages[i] = msg.copyWith(isRead: true);
+            hasUpdates = true;
+          }
+        }
+
+        if (hasUpdates) {
+          messages.refresh();
+          print('DEBUG: Updated local read status for ${unreadMessageIds.length} messages');
+        }
       }
     } catch (e) {
       print('DEBUG: Error in markMessagesAsRead: $e');
@@ -359,38 +349,33 @@ class ChatController extends GetxController {
   }
 
   // =========================
-  // ⬅️ UPDATED: Lifecycle
+  // Lifecycle
   // =========================
   @override
   void onInit() {
     super.onInit();
     print('DEBUG: ChatController onInit called');
 
-    // Load initial data
     loadAddedContacts();
 
-    // Connect socket and load data when user is available
     ever(_authController.currentUser, (u) async {
       if (u != null) {
         print('DEBUG: User available, setting up E2EE and loading data');
         await ensureE2EEReady();
         _connectSocket(u.id);
 
-        // Load data in sequence
         await loadAllUsers();
         await loadAllMessages();
         print('DEBUG: Initial data loading complete');
       }
     });
 
-    // If user is already available, set up immediately
     final me = _authController.currentUser.value;
     if (me != null) {
       print('DEBUG: User already available, setting up immediately');
       ensureE2EEReady();
       _connectSocket(me.id);
 
-      // Load data
       Future.delayed(Duration(milliseconds: 500), () async {
         await loadAllUsers();
         await loadAllMessages();
@@ -400,7 +385,7 @@ class ChatController extends GetxController {
   }
 
   // =========================
-  // ⬅️ UPDATED: Add contact method with better integration
+  // Add contact method
   // =========================
   Future<void> addContact(String username) async {
     if (username.trim().isEmpty) {
@@ -441,7 +426,6 @@ class ChatController extends GetxController {
       if (addResponse['message'] != null) {
         addedContacts.add(user);
 
-        // Also add to allUsers if not already there
         if (!allUsers.any((u) => u.id == user.id)) {
           allUsers.add(user);
         }
@@ -472,7 +456,7 @@ class ChatController extends GetxController {
   }
 
   // =========================
-  // ⬅️ UPDATED: Socket connection with better error handling
+  // Socket connection
   // =========================
   void _connectSocket(int myUserId) {
     if (_socket != null && _socket!.connected) {
@@ -532,7 +516,6 @@ class ChatController extends GetxController {
         final Map<String, dynamic> readData = Map<String, dynamic>.from(data);
         final int readerId = readData['reader_id'];
 
-        // Find and update messages that were read
         bool hasUpdates = false;
         for (var i = 0; i < messages.length; i++) {
           final msg = messages[i];
@@ -554,27 +537,21 @@ class ChatController extends GetxController {
     });
 
     _socket!.onDisconnect((_) => print('DEBUG: Socket disconnected'));
-
-    _socket!.onConnectError(
-        (error) => print('DEBUG: Socket connection error: $error'));
+    _socket!.onConnectError((error) => print('DEBUG: Socket connection error: $error'));
 
     _socket!.connect();
   }
 
-  // panggil dari ChatScreen saat buka DM
   void setActiveUserChat(int userId) {
     if (currentOpenChannelId.value != -1) {
       _socket?.emit('leave_channel_room', currentOpenChannelId.value);
     }
     currentOpenChannelId.value = -1;
     currentOpenUserId.value = userId;
-    // pre-warm session key supaya kirim pertama tidak lag
     _getDmKey(userId);
-    // Mark messages as read when opening chat
     markMessagesAsRead(userId);
   }
 
-  // panggil dari ChatScreen saat buka Channel
   void setActiveChannelChat(int channelId) {
     currentOpenUserId.value = -1;
     if (currentOpenChannelId.value != -1 &&
@@ -585,7 +562,6 @@ class ChatController extends GetxController {
     _socket?.emit('join_channel_room', channelId);
   }
 
-  // panggil dari ChatScreen.dispose()
   void clearActiveChat() {
     if (currentOpenChannelId.value != -1) {
       _socket?.emit('leave_channel_room', currentOpenChannelId.value);
@@ -598,14 +574,13 @@ class ChatController extends GetxController {
   // Messages
   // =========================
   Future<void> loadMessagesForUser(int userId) async {
-    final useSpinner = messages.isEmpty; // spinner cuma saat awal
+    final useSpinner = messages.isEmpty;
     try {
       if (useSpinner) isLoadingMessages.value = true;
 
-      // ❌ jangan clear agar UI gak flicker saat refresh berkala
       final response = await _apiService.getMessages(receiverId: userId);
       if (response['messages'] != null) {
-        final key = await _getDmKey(userId); // derive sekali
+        final key = await _getDmKey(userId);
         final futures = (response['messages'] as List).map((m) async {
           final raw = Map<String, dynamic>.from(m);
           raw['text'] = await _decryptWithKey(raw['text'] as String?, key);
@@ -613,7 +588,7 @@ class ChatController extends GetxController {
         }).toList();
 
         final list = await Future.wait(futures);
-        messages.value = list; // replace tanpa spinner flicker
+        messages.value = list;
       }
     } catch (e) {
       debugPrint('Error loading messages for user: $e');
@@ -630,11 +605,10 @@ class ChatController extends GetxController {
   }
 
   Future<void> loadMessagesForChannel(int channelId) async {
-    final useSpinner = messages.isEmpty; // spinner cuma saat awal
+    final useSpinner = messages.isEmpty;
     try {
       if (useSpinner) isLoadingMessages.value = true;
 
-      // ❌ jangan clear agar UI gak flicker saat refresh berkala
       final response = await _apiService.getMessages(channelId: channelId);
       if (response['messages'] != null) {
         messages.value = (response['messages'] as List)
@@ -655,12 +629,10 @@ class ChatController extends GetxController {
     }
   }
 
-  Future<void> sendMessageToUser(int userId, String? text,
-      {String? imagePath}) async {
+  Future<void> sendMessageToUser(int userId, String? text, {String? imagePath}) async {
     try {
       String? payload = text;
       if (payload != null && payload.isNotEmpty) {
-        // Pakai key yang sudah dicache (cepat)
         payload = await _encryptForUser(payload, userId);
       }
 
@@ -672,7 +644,6 @@ class ChatController extends GetxController {
 
       if (response['data'] != null) {
         final raw = Map<String, dynamic>.from(response['data']);
-        // decrypt dgn key cache utk render cepat
         final key = await _getDmKey(userId);
         raw['text'] = await _decryptWithKey(raw['text'] as String?, key);
         messages.add(Message.fromJson(raw));
@@ -689,8 +660,7 @@ class ChatController extends GetxController {
     }
   }
 
-  Future<void> sendMessageToChannel(int channelId, String? text,
-      {String? imagePath}) async {
+  Future<void> sendMessageToChannel(int channelId, String? text, {String? imagePath}) async {
     try {
       final response = await _apiService.sendMessage(
         text: text,
@@ -740,8 +710,7 @@ class ChatController extends GetxController {
     }
   }
 
-  Future<void> createChannel(String name,
-      {String? topic, bool isPublic = true}) async {
+  Future<void> createChannel(String name, {String? topic, bool isPublic = true}) async {
     try {
       final response = await _apiService.createChannel(name,
           topic: topic, isPublic: isPublic);
@@ -854,15 +823,6 @@ class ChatController extends GetxController {
     final currentUserId = Get.find<AuthController>().currentUser.value?.id;
     if (currentUserId == null) return;
 
-    final unreadMessages = messages
-        .where((m) =>
-            m.senderId != currentUserId && // not my message
-            !m.isRead && // not read yet
-            m.id != null) // has valid id
-        .map((m) => m.id)
-        .toList();
-
-    // Mark messages as read for each sender (userId)
     final senderIds = messages
         .where((m) => m.senderId != currentUserId && !m.isRead && m.id != null)
         .map((m) => m.senderId)
@@ -873,81 +833,19 @@ class ChatController extends GetxController {
     }
   }
 
-  // Handle incoming read status updates from socket
   void handleMessageRead(Map<String, dynamic> data) {
     final messageId = data['message_id'];
-    final readerId = data['reader_id'];
 
-    // Find and update the message
     final index = messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       messages[index] = messages[index].copyWith(isRead: true);
       messages.refresh();
     }
   }
-}
 
-  // Future<void> addContact(String username) async {
-  //   if (username.trim().isEmpty) {
-  //     Get.snackbar(
-  //       'Error',
-  //       'Please enter a username',
-  //       snackPosition: SnackPosition.BOTTOM,
-  //       backgroundColor: Colors.red[400],
-  //       colorText: Colors.white,
-  //     );
-  //     return;
-  //   }
-  //   try {
-  //     isAddingContact.value = true;
-  //     final searchResponse = await _apiService.searchUserByUsername(username);
-  //     if (searchResponse['user'] == null) {
-  //       Get.snackbar(
-  //         'Error',
-  //         'User not found',
-  //         snackPosition: SnackPosition.BOTTOM,
-  //         backgroundColor: Colors.red[400],
-  //         colorText: Colors.white,
-  //       );
-  //       return;
-  //     }
-  //     final user = User.fromJson(searchResponse['user']);
-  //     if (addedContacts.any((c) => c.id == user.id)) {
-  //       Get.snackbar(
-  //         'Info',
-  //         'Contact already exists',
-  //         snackPosition: SnackPosition.BOTTOM,
-  //         backgroundColor: Colors.orange[400],
-  //         colorText: Colors.white,
-  //       );
-  //       return;
-  //     }
-  //     final addResponse = await _apiService.addContact(user.id);
-  //     if (addResponse['message'] != null) {
-  //       addedContacts.add(user);
-  //       // Also add to allUsers if not already there
-  //       if (!allUsers.any((u) => u.id == user.id)) {
-  //         allUsers.add(user);
-  //       }
-  //       Get.snackbar(
-  //         'Success',
-  //         'Contact added successfully',
-  //         snackPosition: SnackPosition.BOTTOM,
-  //         backgroundColor: Colors.green[400],
-  //         colorText: Colors.white,
-  //         icon: const Icon(Icons.check_circle, color: Colors.white),
-  //       );
-  //     }
-  //   } catch (e) {
-  //     debugPrint('Error adding contact: $e');
-  //     Get.snackbar(
-  //       'Error',
-  //       'Failed to add contact: ${e.toString()}',
-  //       snackPosition: SnackPosition.BOTTOM,
-  //       backgroundColor: Colors.red[400],
-  //       colorText: Colors.white,
-  //     );
-  //   } finally {
-  //     isAddingContact.value = false;
-  //   }
-  // }
+  @override
+  void onClose() {
+    _socket?.disconnect();
+    super.onClose();
+  }
+}

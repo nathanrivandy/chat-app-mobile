@@ -21,6 +21,7 @@ dependencies:
   image_picker: ^1.0.2
   path: ^1.8.3
   permission_handler: ^12.0.1
+  rive: ^0.13.20
   socket_io_client: ^2.0.3+1
 
 dev_dependencies:
@@ -30,9 +31,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # Assets
-  # assets:
-  #   - assets/images/
+
+#Assets
+assets:
+  - assets/animation/face_id_animation.riv
+  - assets/face_id_animation.riv
+  - assets/look.riv
+  - assets/animation/auth_teddy.riv
   #   - assets/icons/
   # Fonts (optional)
   # fonts:

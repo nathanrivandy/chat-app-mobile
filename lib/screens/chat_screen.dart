@@ -69,16 +69,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
-  // ---- DEDUPE UI (anti bubble dobel dari HTTP + socket) ----
+  // DEDUPE UI (anti bubble dobel dari HTTP + socket)
   List<Message> _dedupeMessages(List<Message> source) {
     final seen = <int>{};
     final out = <Message>[];
     for (final m in source) {
-      final id = m.id; // asumsikan Message.id itu int
+      final id = m.id;
       if (id is int) {
         if (seen.add(id)) out.add(m);
       } else {
-        // kalau (sangat jarang) id null, tetap tampilkan
         out.add(m);
       }
     }
@@ -121,16 +120,16 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       _messageController.clear();
       setState(() => _isTyping = false);
       await _scrollToBottom();
-
-      // ❌ jangan refresh manual
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to send message: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red[400],
-        colorText: Colors.white,
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -159,36 +158,43 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   void _showImagePickerDialog() {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
+              width: 32,
               height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
+              margin: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: colorScheme.onSurfaceVariant.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Text('Select Image',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
+            Text(
+              'Select Image',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildImageOption(
                   icon: Icons.camera_alt,
                   label: 'Camera',
-                  color: const Color(0xFF6C5CE7),
+                  color: colorScheme.primary,
                   onTap: () {
                     Get.back();
                     _takePicture();
@@ -197,7 +203,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 _buildImageOption(
                   icon: Icons.photo_library,
                   label: 'Gallery',
-                  color: const Color(0xFF00D4AA),
+                  color: colorScheme.tertiary,
                   onTap: () {
                     Get.back();
                     _pickImage();
@@ -218,41 +224,48 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(icon, size: 32, color: color),
             ),
-            child: Icon(icon, size: 32, color: color),
-          ),
-          const SizedBox(height: 8),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[700])),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: colorScheme.surface,
       appBar: _buildAppBar(),
       body: Column(
         children: [
           // Messages list
           Expanded(
             child: Obx(() {
-              // gunakan list yang sudah di-dedupe untuk render
               final visibleMessages = _dedupeMessages(_chatController.messages);
 
               if (_chatController.isLoadingMessages.value &&
@@ -261,18 +274,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(
-                        width: 50,
-                        height: 50,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation(Color(0xFF6C5CE7)),
+                      const CircularProgressIndicator.adaptive(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Loading messages...',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onSurface,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text('Loading messages...',
-                          style:
-                              TextStyle(color: Colors.grey[600], fontSize: 16)),
                     ],
                   ),
                 );
@@ -297,7 +306,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       message,
                       isMe,
                       index,
-                      visibleMessages, // <-- pakai list dedupe untuk konteks
+                      visibleMessages,
                     ),
                   );
                 },
@@ -313,11 +322,15 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return AppBar(
       elevation: 0,
-      backgroundColor: Colors.white,
+      scrolledUnderElevation: 1,
+      backgroundColor: colorScheme.surface,
+      surfaceTintColor: colorScheme.surfaceTint,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+        icon: Icon(Icons.arrow_back_ios, color: colorScheme.onSurface),
         onPressed: () => Get.back(),
       ),
       title: widget.user != null
@@ -331,8 +344,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       gradient: widget.user!.profilePhotoUrl == null
-                          ? const LinearGradient(
-                              colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
+                          ? LinearGradient(
+                              colors: [
+                                colorScheme.primary,
+                                colorScheme.tertiary,
+                              ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             )
@@ -342,13 +358,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.network(
-                              'http://192.168.74.174:6969${widget.user!.profilePhotoUrl}',
+                              'http://103.123.18.29:6969${widget.user!.profilePhotoUrl}',
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.person, color: Colors.white),
+                                  Icon(Icons.person, color: colorScheme.onPrimary),
                             ),
                           )
-                        : const Icon(Icons.person, color: Colors.white),
+                        : Icon(Icons.person, color: colorScheme.onPrimary),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -356,23 +372,30 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.user!.fullName,
-                          style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87)),
+                      Text(
+                        widget.user!.fullName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
                       Row(
                         children: [
                           Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  borderRadius: BorderRadius.circular(4))),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade400,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
                           const SizedBox(width: 6),
-                          Text('Online • Credit: ${widget.user!.creditScore}',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[600])),
+                          Text(
+                            'Online • Credit: ${widget.user!.creditScore}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -386,21 +409,24 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                      color: const Color(0xFF6C5CE7).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.tag, color: Color(0xFF6C5CE7)),
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.tag, color: colorScheme.onPrimaryContainer),
                 ),
                 const SizedBox(width: 12),
-                Text('#${widget.channel!.name}',
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87)),
+                Text(
+                  '#${widget.channel!.name}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
               ],
             ),
       actions: [
         IconButton(
-          icon: Icon(Icons.more_vert, color: Colors.grey[700]),
+          icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
           onPressed: () {},
         ),
       ],
@@ -408,78 +434,72 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF6C5CE7).withOpacity(0.1),
-                  const Color(0xFFA29BFE).withOpacity(0.1)
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(60),
               ),
-              borderRadius: BorderRadius.circular(60),
+              child: Icon(
+                Icons.chat_bubble_outline,
+                size: 60,
+                color: colorScheme.onPrimaryContainer,
+              ),
             ),
-            child: const Icon(Icons.chat_bubble_outline,
-                size: 60, color: Color(0xFF6C5CE7)),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            widget.user != null
-                ? 'Start a conversation with ${widget.user!.fullName}'
-                : 'No messages in #${widget.channel!.name} yet',
-            style: TextStyle(
-                fontSize: 18,
+            const SizedBox(height: 24),
+            Text(
+              widget.user != null
+                  ? 'Start a conversation with ${widget.user!.fullName}'
+                  : 'No messages in #${widget.channel!.name} yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800]),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text('Send a message to get the conversation started!',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              textAlign: TextAlign.center),
-        ],
+                color: colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Send a message to get the conversation started!',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // --- di dalam _buildMessageInput() ---
   Widget _buildMessageInput() {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+          color: colorScheme.surface,
         ),
         child: Row(
           children: [
-            GestureDetector(
-              onTap: _showImagePickerDialog,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6C5CE7).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(
-                  Icons.add_photo_alternate,
-                  color: Color(0xFF6C5CE7),
-                  size: 24,
+            IconButton.filled(
+              onPressed: _showImagePickerDialog,
+              icon: const Icon(Icons.add_photo_alternate),
+              style: IconButton.styleFrom(
+                backgroundColor: colorScheme.primaryContainer,
+                foregroundColor: colorScheme.onPrimaryContainer,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
@@ -487,7 +507,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F3F4),
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: TextField(
@@ -496,9 +516,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   minLines: 1,
                   maxLines: 4,
                   textCapitalization: TextCapitalization.sentences,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
-                    hintStyle: TextStyle(color: Colors.grey[500]),
+                    hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -510,42 +535,28 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(width: 12),
-            GestureDetector(
-              onTap: () {
-                final text = _messageController.text.trim();
-                if (text.isEmpty) {
-                  _showImagePickerDialog();
-                } else {
-                  _sendMessage();
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: (_messageController.text.trim().isNotEmpty)
-                        ? const [Color(0xFF6C5CE7), Color(0xFFA29BFE)]
-                        : [Colors.grey[400]!, Colors.grey[500]!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              child: IconButton.filled(
+                onPressed: () {
+                  final text = _messageController.text.trim();
+                  if (text.isEmpty) {
+                    _showImagePickerDialog();
+                  } else {
+                    _sendMessage();
+                  }
+                },
+                icon: const Icon(Icons.send),
+                style: IconButton.styleFrom(
+                  backgroundColor: (_messageController.text.trim().isNotEmpty)
+                      ? colorScheme.primary
+                      : colorScheme.surfaceContainerHigh,
+                  foregroundColor: (_messageController.text.trim().isNotEmpty)
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurfaceVariant,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: (_messageController.text.trim().isNotEmpty)
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF6C5CE7).withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: const Icon(
-                  Icons.send,
-                  color: Colors.white,
-                  size: 20,
                 ),
               ),
             ),
@@ -555,17 +566,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ⬇️ tambahkan parameter 'listForContext' agar hitung showAvatar konsisten dengan list dedupe
   Widget _buildMessageBubble(
       Message message, bool isMe, int index, List<Message> listForContext) {
+    final colorScheme = Theme.of(context).colorScheme;
     final showAvatar = !isMe &&
         widget.channel != null &&
         (index == 0 || listForContext[index - 1].senderId != message.senderId);
 
     return Container(
       key: ValueKey('bubble_${message.id ?? index}'),
-      margin:
-          EdgeInsets.only(bottom: 8, left: isMe ? 50 : 0, right: isMe ? 0 : 50),
+      margin: EdgeInsets.only(
+        bottom: 8,
+        left: isMe ? 64 : 0,
+        right: isMe ? 0 : 64,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment:
@@ -578,15 +592,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     height: 32,
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
+                      gradient: LinearGradient(
+                        colors: [colorScheme.primary, colorScheme.tertiary],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child:
-                        const Icon(Icons.person, color: Colors.white, size: 18),
+                    child: Icon(
+                      Icons.person,
+                      color: colorScheme.onPrimary,
+                      size: 18,
+                    ),
                   )
                 : const SizedBox(width: 40),
           ],
@@ -600,39 +617,29 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     padding: const EdgeInsets.only(left: 12, bottom: 4),
                     child: Text(
                       message.senderFullName,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6C5CE7),
-                          fontWeight: FontWeight.w600),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     gradient: isMe
-                        ? const LinearGradient(
-                            colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
+                        ? LinearGradient(
+                            colors: [colorScheme.primary, colorScheme.tertiary],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           )
                         : null,
-                    color: isMe ? null : Colors.white,
+                    color: isMe ? null : colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20),
                       topRight: const Radius.circular(20),
                       bottomLeft: Radius.circular(isMe ? 20 : 4),
                       bottomRight: Radius.circular(isMe ? 4 : 20),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isMe
-                            ? const Color(0xFF6C5CE7).withOpacity(0.3)
-                            : Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,27 +647,23 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       if (message.imageUrl != null)
                         Container(
                           margin: EdgeInsets.only(
-                              bottom: (message.text != null &&
-                                      message.text!.isNotEmpty)
-                                  ? 8
-                                  : 0),
+                            bottom: (message.text != null && message.text!.isNotEmpty) ? 8 : 0,
+                          ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.network(
-                              'http://192.168.74.174:6969${message.imageUrl}',
+                              'http://103.123.18.29:6969${message.imageUrl}',
                               fit: BoxFit.cover,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
+                              loadingBuilder: (context, child, loadingProgress) {
                                 if (loadingProgress == null) return child;
                                 return SizedBox(
                                   height: 150,
                                   child: Center(
-                                    child: CircularProgressIndicator(
+                                    child: CircularProgressIndicator.adaptive(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                          isMe
-                                              ? Colors.white
-                                              : const Color(0xFF6C5CE7)),
+                                        isMe ? colorScheme.onPrimary : colorScheme.primary,
+                                      ),
                                     ),
                                   ),
                                 );
@@ -669,20 +672,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                 return Container(
                                   height: 150,
                                   decoration: BoxDecoration(
-                                      color: Colors.grey[200],
-                                      borderRadius: BorderRadius.circular(12)),
+                                    color: colorScheme.errorContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                   child: Center(
                                     child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                                      mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.broken_image,
-                                            color: Colors.grey[400], size: 32),
+                                        Icon(
+                                          Icons.broken_image,
+                                          color: colorScheme.onErrorContainer,
+                                          size: 32,
+                                        ),
                                         const SizedBox(height: 8),
-                                        Text('Image not available',
-                                            style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 12)),
+                                        Text(
+                                          'Image not available',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: colorScheme.onErrorContainer,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -694,39 +702,38 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       if (message.text != null && message.text!.isNotEmpty)
                         Text(
                           message.text!,
-                          style: TextStyle(
-                              color: isMe ? Colors.white : Colors.black87,
-                              fontSize: 15,
-                              height: 1.4),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isMe ? colorScheme.onPrimary : colorScheme.onSurface,
+                            height: 1.4,
+                          ),
                         ),
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding:
-                          const EdgeInsets.only(top: 4, left: 12, right: 8),
-                      child: Text(
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 12, right: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
                         _formatTime(message.createdAt),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                      ),
-                    ),
-                    // Read indicator untuk pesan yang saya kirim
-                    if (isMe)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Icon(
-                          message.isRead ? Icons.done_all : Icons.done,
-                          size: 14,
-                          color: message.isRead
-                              ? const Color(
-                                  0xFF00D4AA) // hijau untuk sudah dibaca
-                              : Colors.grey[400], // abu-abu untuk terkirim
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                  ],
+                      // Read indicator untuk pesan yang saya kirim
+                      if (isMe) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          message.isRead ? Icons.done_all : Icons.done,
+                          size: 16,
+                          color: message.isRead
+                              ? Colors.green.shade400
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),

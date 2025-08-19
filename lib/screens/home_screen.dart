@@ -6,6 +6,7 @@ import '../controllers/chat_controller.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
 import 'channels_screen.dart';
+import 'package:rive/rive.dart' as rive;
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -32,44 +33,31 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: _screens[_selectedIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: Offset(0, -2),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: Color(0xFF6C5CE7),
-          unselectedItemColor: Colors.grey[600],
-          selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600),
-          elevation: 0,
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
-              label: 'Chats',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.group_outlined),
-              activeIcon: Icon(Icons.group),
-              label: 'Channels',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        indicatorColor: Theme.of(context).colorScheme.secondaryContainer,
+        destinations: [
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Chats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.group_outlined),
+            selectedIcon: Icon(Icons.group),
+            label: 'Channels',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }
@@ -79,65 +67,70 @@ class ContactsTab extends StatelessWidget {
   final ChatController _chatController = Get.find<ChatController>();
   final TextEditingController _searchController = TextEditingController();
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        title: Text(
-          'Chats',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
+  _showRive(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        content: SizedBox(
+          width: 300,
+          height: 300,
+          child: rive.RiveAnimation.asset(
+            "assets/animation/auth_teddy.riv",
+            fit: BoxFit.cover,
           ),
         ),
-        actions: [
-          Container(
-            margin: EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: Color(0xFFF1F3F4),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: Icon(Icons.logout_outlined, color: Colors.grey[700]),
-              onPressed: () {
-                Get.find<AuthController>().logout();
-              },
-            ),
+      ),
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: colorScheme.surfaceTint,
+        title: Text(
+          'Chats',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
           ),
-        ],
+        ),
       ),
       body: Column(
         children: [
           // Search Bar
           Container(
             margin: EdgeInsets.all(16),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
+            child: SearchBar(
+              controller: _searchController,
+              hintText: 'Search chats...',
+              leading: Icon(Icons.search),
+              trailing: [
+                IconButton(
+                  icon: Icon(Icons.person_add_outlined),
+                  onPressed: () => _showAddContactDialog(context),
+                  style: IconButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                  ),
                 ),
               ],
-            ),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search chats...',
-                hintStyle: TextStyle(color: Colors.grey[500]),
-                border: InputBorder.none,
-                prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
-                suffixIcon: IconButton(
-                  icon:
-                      Icon(Icons.person_add_outlined, color: Color(0xFF6C5CE7)),
-                  onPressed: () => _showAddContactDialog(context),
+              backgroundColor: WidgetStatePropertyAll(
+                colorScheme.surfaceContainerHigh,
+              ),
+              elevation: WidgetStatePropertyAll(0),
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
                 ),
               ),
               onChanged: (value) {
@@ -154,22 +147,12 @@ class ContactsTab extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Color(0xFF6C5CE7),
-                          ),
-                        ),
-                      ),
+                      CircularProgressIndicator.adaptive(),
                       SizedBox(height: 16),
                       Text(
                         'Loading chats...',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -191,54 +174,40 @@ class ContactsTab extends StatelessWidget {
                           width: 120,
                           height: 120,
                           decoration: BoxDecoration(
-                            color: Color(0xFF6C5CE7).withOpacity(0.1),
+                            color: colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(60),
                           ),
                           child: Icon(
                             Icons.chat_bubble_outline,
                             size: 60,
-                            color: Color(0xFF6C5CE7),
+                            color: colorScheme.onPrimaryContainer,
                           ),
                         ),
                         SizedBox(height: 24),
                         Text(
                           'No chats yet',
-                          style: TextStyle(
-                            fontSize: 24,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[800],
+                            color: colorScheme.onSurface,
                           ),
                         ),
                         SizedBox(height: 8),
                         Text(
                           'Start a conversation by adding contacts',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 32),
-                        Container(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _showAddContactDialog(context),
-                            icon: Icon(Icons.person_add, color: Colors.white),
-                            label: Text(
-                              'Add Contact',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF6C5CE7),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                        FilledButton.icon(
+                          onPressed: () => _showAddContactDialog(context),
+                          icon: Icon(Icons.person_add),
+                          label: Text('Add Contact'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: Size(double.infinity, 56),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
@@ -258,18 +227,12 @@ class ContactsTab extends StatelessWidget {
                   final unreadCount = chatData['unreadCount'];
                   final timestamp = chatData['timestamp'];
 
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
+                  return Card(
+                    margin: EdgeInsets.only(bottom: 8),
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: ListTile(
                       contentPadding: EdgeInsets.all(16),
@@ -281,8 +244,8 @@ class ContactsTab extends StatelessWidget {
                           gradient: user.profilePhotoUrl == null
                               ? LinearGradient(
                                   colors: [
-                                    Color(0xFF6C5CE7),
-                                    Color(0xFFA29BFE),
+                                    colorScheme.primary,
+                                    colorScheme.tertiary,
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
@@ -293,12 +256,12 @@ class ContactsTab extends StatelessWidget {
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(16),
                                 child: Image.network(
-                                  'http://192.168.74.174:6969${user.profilePhotoUrl}',
+                                  'http://103.123.18.29:6969${user.profilePhotoUrl}',
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Icon(
                                       Icons.person,
-                                      color: Colors.white,
+                                      color: colorScheme.onPrimary,
                                       size: 28,
                                     );
                                   },
@@ -306,7 +269,7 @@ class ContactsTab extends StatelessWidget {
                               )
                             : Icon(
                                 Icons.person,
-                                color: Colors.white,
+                                color: colorScheme.onPrimary,
                                 size: 28,
                               ),
                       ),
@@ -315,19 +278,17 @@ class ContactsTab extends StatelessWidget {
                           Expanded(
                             child: Text(
                               user.fullName,
-                              style: TextStyle(
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.black87,
+                                color: colorScheme.onSurface,
                               ),
                             ),
                           ),
                           if (timestamp != null)
                             Text(
                               _formatTimestamp(timestamp),
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                         ],
@@ -338,8 +299,8 @@ class ContactsTab extends StatelessWidget {
                           SizedBox(height: 4),
                           Text(
                             '@${user.username}',
-                            style: TextStyle(
-                              color: Color(0xFF6C5CE7),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.primary,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -349,9 +310,8 @@ class ContactsTab extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   lastMessage ?? 'No messages yet',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -359,21 +319,10 @@ class ContactsTab extends StatelessWidget {
                               ),
                               if (unreadCount > 0) ...[
                                 SizedBox(width: 8),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFF6C5CE7),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '$unreadCount',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
+                                Badge(
+                                  label: Text('$unreadCount'),
+                                  backgroundColor: colorScheme.error,
+                                  textColor: colorScheme.onError,
                                 ),
                               ],
                             ],
@@ -384,33 +333,23 @@ class ContactsTab extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _getCreditScoreColor(user.creditScore),
+                              color: _getCreditScoreColor(user.creditScore, colorScheme),
                               borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _getCreditScoreColor(user.creditScore)
-                                      .withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
                             ),
                             child: Text(
                               '${user.creditScore}',
-                              style: TextStyle(
-                                color: Colors.white,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onPrimary,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
                               ),
                             ),
                           ),
                           SizedBox(height: 4),
                           Icon(
                             Icons.chevron_right,
-                            color: Colors.grey[400],
+                            color: colorScheme.onSurfaceVariant,
                             size: 20,
                           ),
                         ],
@@ -433,10 +372,17 @@ class ContactsTab extends StatelessWidget {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showRive(context),
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        child: Icon(Icons.person_add),
+        tooltip: 'Add Contact',
+      ),
     );
   }
 
-  // ⬅️ UPDATED: Method untuk mendapatkan chat participants dengan contacts yang belum pernah chat
+  // Method untuk mendapatkan chat participants dengan contacts yang belum pernah chat
   List<Map<String, dynamic>> _getChatParticipants() {
     final currentUserId = Get.find<AuthController>().currentUser.value?.id;
     if (currentUserId == null) {
@@ -446,12 +392,11 @@ class ContactsTab extends StatelessWidget {
 
     print('DEBUG: currentUserId = $currentUserId');
     print('DEBUG: messages.length = ${_chatController.messages.length}');
-    print(
-        'DEBUG: addedContacts.length = ${_chatController.addedContacts.length}');
+    print('DEBUG: addedContacts.length = ${_chatController.addedContacts.length}');
 
     Map<int, Map<String, dynamic>> chatMap = {};
 
-    // ⬅️ STEP 1: Tambahkan semua contacts terlebih dahulu
+    // STEP 1: Tambahkan semua contacts terlebih dahulu
     for (var contact in _chatController.addedContacts) {
       if (contact.id != currentUserId) {
         chatMap[contact.id] = {
@@ -464,10 +409,9 @@ class ContactsTab extends StatelessWidget {
       }
     }
 
-    // ⬅️ STEP 2: Update dengan data dari messages (jika ada)
+    // STEP 2: Update dengan data dari messages (jika ada)
     for (var message in _chatController.messages) {
-      print(
-          'DEBUG: Processing message - id: ${message.id}, senderId: ${message.senderId}, receiverId: ${message.receiverId}, channelId: ${message.channelId}, isRead: ${message.isRead}');
+      print('DEBUG: Processing message - id: ${message.id}, senderId: ${message.senderId}, receiverId: ${message.receiverId}, channelId: ${message.channelId}, isRead: ${message.isRead}');
 
       // Skip channel messages - we only want DM messages
       if (message.channelId != null) {
@@ -482,8 +426,7 @@ class ContactsTab extends StatelessWidget {
         // Current user sent this message to someone
         otherUserId = message.receiverId;
         print('DEBUG: Current user sent message to $otherUserId');
-      } else if (message.receiverId == currentUserId &&
-          message.senderId != null) {
+      } else if (message.receiverId == currentUserId && message.senderId != null) {
         // Current user received this message from someone
         otherUserId = message.senderId;
         print('DEBUG: Current user received message from $otherUserId');
@@ -500,16 +443,14 @@ class ContactsTab extends StatelessWidget {
       // Find the other user - first check if already in chatMap
       if (chatMap.containsKey(otherUserId)) {
         otherUser = chatMap[otherUserId]!['user'];
-        print(
-            'DEBUG: Found user in chatMap: ${otherUser.fullName} (id: ${otherUser.id})');
+        print('DEBUG: Found user in chatMap: ${otherUser.fullName} (id: ${otherUser.id})');
       } else {
         // Try to find in allUsers list
         try {
           otherUser = _chatController.allUsers.firstWhere(
             (user) => user.id == otherUserId,
           );
-          print(
-              'DEBUG: Found user in allUsers: ${otherUser.fullName} (id: ${otherUser.id})');
+          print('DEBUG: Found user in allUsers: ${otherUser.fullName} (id: ${otherUser.id})');
         } catch (e) {
           print('DEBUG: User with id $otherUserId not found in allUsers list');
 
@@ -518,11 +459,9 @@ class ContactsTab extends StatelessWidget {
             otherUser = _chatController.addedContacts.firstWhere(
               (user) => user.id == otherUserId,
             );
-            print(
-                'DEBUG: Found user in contacts: ${otherUser.fullName} (id: ${otherUser.id})');
+            print('DEBUG: Found user in contacts: ${otherUser.fullName} (id: ${otherUser.id})');
           } catch (e2) {
-            print(
-                'DEBUG: User with id $otherUserId not found in contacts either, skipping');
+            print('DEBUG: User with id $otherUserId not found in contacts either, skipping');
             continue;
           }
         }
@@ -539,20 +478,17 @@ class ContactsTab extends StatelessWidget {
 
       // Update with message data
       final currentTimestamp = chatMap[otherUserId]!['timestamp'] as DateTime?;
-      if (currentTimestamp == null ||
-          message.timestamp.isAfter(currentTimestamp)) {
+      if (currentTimestamp == null || message.timestamp.isAfter(currentTimestamp)) {
         chatMap[otherUserId]!['lastMessage'] = message.content;
         chatMap[otherUserId]!['timestamp'] = message.timestamp;
-        print(
-            'DEBUG: Updated latest message for user ${otherUser.fullName}: ${message.content}');
+        print('DEBUG: Updated latest message for user ${otherUser.fullName}: ${message.content}');
       }
 
-      // ⬅️ FIXED: Count unread messages correctly - only messages received by current user that are not read
+      // Count unread messages correctly - only messages received by current user that are not read
       if (message.receiverId == currentUserId && !message.isRead) {
         int currentCount = chatMap[otherUserId]!['unreadCount'] as int;
         chatMap[otherUserId]!['unreadCount'] = currentCount + 1;
-        print(
-            'DEBUG: Incremented unread count for user ${otherUser.fullName} to ${currentCount + 1}');
+        print('DEBUG: Incremented unread count for user ${otherUser.fullName} to ${currentCount + 1}');
       }
     }
 
@@ -584,8 +520,7 @@ class ContactsTab extends StatelessWidget {
 
     print('DEBUG: Final chat list length: ${chatList.length}');
     for (var chat in chatList) {
-      print(
-          'DEBUG: Chat with ${chat['user'].fullName} - lastMessage: ${chat['lastMessage']} - unreadCount: ${chat['unreadCount']} - timestamp: ${chat['timestamp']}');
+      print('DEBUG: Chat with ${chat['user'].fullName} - lastMessage: ${chat['lastMessage']} - unreadCount: ${chat['unreadCount']} - timestamp: ${chat['timestamp']}');
     }
 
     return chatList;
@@ -615,33 +550,36 @@ class ContactsTab extends StatelessWidget {
 
   void _showAddContactDialog(BuildContext context) {
     final TextEditingController usernameController = TextEditingController();
+    final colorScheme = Theme.of(context).colorScheme;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: colorScheme.surfaceTint,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(28),
         ),
         title: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(8),
+              padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Color(0xFF6C5CE7).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 Icons.person_add,
-                color: Color(0xFF6C5CE7),
+                color: colorScheme.onPrimaryContainer,
                 size: 24,
               ),
             ),
-            SizedBox(width: 12),
+            SizedBox(width: 16),
             Text(
               'Add Contact',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                fontSize: 20,
+                color: colorScheme.onSurface,
               ),
             ),
           ],
@@ -651,31 +589,25 @@ class ContactsTab extends StatelessWidget {
           children: [
             Text(
               'Enter username to add as contact',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 24),
             TextField(
               controller: usernameController,
               decoration: InputDecoration(
                 labelText: 'Username',
                 prefixText: '@',
-                prefixStyle: TextStyle(
-                  color: Color(0xFF6C5CE7),
+                prefixStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.primary,
                   fontWeight: FontWeight.bold,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Color(0xFF6C5CE7),
-                    width: 2,
-                  ),
-                ),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest,
               ),
               autofocus: true,
             ),
@@ -684,75 +616,64 @@ class ContactsTab extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Get.back(),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
+            child: Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               if (usernameController.text.trim().isNotEmpty) {
                 _chatController.addContact(usernameController.text.trim());
                 Get.back();
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF6C5CE7),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Add Contact',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: Text('Add Contact'),
           ),
         ],
       ),
     );
   }
 
-  Color _getCreditScoreColor(int score) {
-    if (score >= 150) return Color(0xFF00D4AA);
-    if (score >= 100) return Color(0xFF0984E3);
-    if (score >= 50) return Color(0xFFE17055);
-    return Color(0xFFE74C3C);
+  Color _getCreditScoreColor(int score, ColorScheme colorScheme) {
+    if (score >= 150) return Colors.green.shade600;
+    if (score >= 100) return colorScheme.primary;
+    if (score >= 50) return Colors.orange.shade600;
+    return colorScheme.error;
   }
 
-  void _showReputationDialog(
-      BuildContext context, int userId, String userName) {
+  void _showReputationDialog(BuildContext context, int userId, String userName) {
     final TextEditingController reasonController = TextEditingController();
+    final colorScheme = Theme.of(context).colorScheme;
     int selectedDelta = 1;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
+          backgroundColor: colorScheme.surface,
+          surfaceTintColor: colorScheme.surfaceTint,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(28),
           ),
           title: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(8),
+                padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Color(0xFF6C5CE7).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
                   Icons.star_rate,
-                  color: Color(0xFF6C5CE7),
+                  color: colorScheme.onPrimaryContainer,
                   size: 24,
                 ),
               ),
-              SizedBox(width: 12),
+              SizedBox(width: 16),
               Expanded(
                 child: Text(
                   'Rate $userName',
-                  style: TextStyle(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -763,65 +684,63 @@ class ContactsTab extends StatelessWidget {
             children: [
               Text(
                 'How would you rate this user\'s attitude?',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              SizedBox(height: 20),
+              SizedBox(height: 24),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   _buildRatingChip(
+                    context: context,
                     label: 'Toxic',
                     icon: Icons.thumb_down,
                     value: -5,
-                    color: Color(0xFFE74C3C),
+                    color: colorScheme.error,
                     isSelected: selectedDelta == -5,
                     onTap: () => setState(() => selectedDelta = -5),
                   ),
                   _buildRatingChip(
+                    context: context,
                     label: 'Poor',
                     icon: Icons.sentiment_dissatisfied,
                     value: -1,
-                    color: Color(0xFFE17055),
+                    color: Colors.orange.shade600,
                     isSelected: selectedDelta == -1,
                     onTap: () => setState(() => selectedDelta = -1),
                   ),
                   _buildRatingChip(
+                    context: context,
                     label: 'Good',
                     icon: Icons.sentiment_satisfied,
                     value: 1,
-                    color: Color(0xFF0984E3),
+                    color: colorScheme.primary,
                     isSelected: selectedDelta == 1,
                     onTap: () => setState(() => selectedDelta = 1),
                   ),
                   _buildRatingChip(
+                    context: context,
                     label: 'Excellent',
                     icon: Icons.thumb_up,
                     value: 5,
-                    color: Color(0xFF00D4AA),
+                    color: Colors.green.shade600,
                     isSelected: selectedDelta == 5,
                     onTap: () => setState(() => selectedDelta = 5),
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 20),
               TextField(
                 controller: reasonController,
                 decoration: InputDecoration(
                   labelText: 'Reason (optional)',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Color(0xFF6C5CE7),
-                      width: 2,
-                    ),
-                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest,
                 ),
                 maxLines: 2,
               ),
@@ -830,12 +749,9 @@ class ContactsTab extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Get.back(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
+              child: Text('Cancel'),
             ),
-            ElevatedButton(
+            FilledButton(
               onPressed: () {
                 // TODO: Implement reputation submission
                 // _chatController.submitReputation(
@@ -847,17 +763,7 @@ class ContactsTab extends StatelessWidget {
                 // );
                 Get.back();
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF6C5CE7),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Submit',
-                style: TextStyle(color: Colors.white),
-              ),
+              child: Text('Submit'),
             ),
           ],
         ),
@@ -866,6 +772,7 @@ class ContactsTab extends StatelessWidget {
   }
 
   Widget _buildRatingChip({
+    required BuildContext context,
     required String label,
     required IconData icon,
     required int value,
@@ -873,38 +780,38 @@ class ContactsTab extends StatelessWidget {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color,
-            width: isSelected ? 0 : 1,
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? colorScheme.onSecondaryContainer : color,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : color,
-              size: 16,
+          SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: isSelected ? colorScheme.onSecondaryContainer : color,
+              fontWeight: FontWeight.w600,
             ),
-            SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : color,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
+      backgroundColor: color.withOpacity(0.1),
+      selectedColor: colorScheme.secondaryContainer,
+      checkmarkColor: colorScheme.onSecondaryContainer,
+      side: BorderSide(
+        color: isSelected ? Colors.transparent : color,
+        width: 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
       ),
     );
   }

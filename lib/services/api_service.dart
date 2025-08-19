@@ -4,8 +4,11 @@ import 'package:http/http.dart' as http;
 import 'package:get_storage/get_storage.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.74.174:6969/api';
+  static const String baseUrl = 'http://103.123.18.29:6969/api';
   final GetStorage _storage = GetStorage();
+
+  // Required header value for ALL endpoints
+  static const String _nathOnlyHeaderValue = 'UmFoYXNpYUt1U2Vtb2dhQW1hbllo';
 
   // ===== Helpers =============================================================
   Uri _buildUri(String path, [Map<String, dynamic>? params]) {
@@ -24,7 +27,10 @@ class ApiService {
     final headers = <String, String>{
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      // ALWAYS include nathonly header for ALL endpoints
+      'nathonly': _nathOnlyHeaderValue,
     };
+    
     if (withAuth && token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -36,7 +42,10 @@ class ApiService {
     final token = _storage.read('token');
     final headers = <String, String>{
       'Accept': 'application/json',
+      // ALWAYS include nathonly header for ALL endpoints
+      'nathonly': _nathOnlyHeaderValue,
     };
+    
     if (withAuth && token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -57,12 +66,22 @@ class ApiService {
   }
 
   Map<String, dynamic> _parseResponse(http.Response res) {
+    print('DEBUG: API Response - Status: ${res.statusCode}');
+    print('DEBUG: API Response - Headers: ${res.headers}');
+    print('DEBUG: API Response - Body: ${res.body.substring(0, res.body.length > 500 ? 500 : res.body.length)}');
+    
     final data = _decodeJson<Map<String, dynamic>>(
       res.body,
       res.headers['content-type'],
       res.statusCode,
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return data;
+    
+    // Handle specific error cases
+    if (res.statusCode == 404) {
+      throw Exception('Endpoint not found (404) - Check server configuration or nathonly header');
+    }
+    
     throw Exception(data['error'] ?? 'HTTP ${res.statusCode}');
   }
 
@@ -70,34 +89,62 @@ class ApiService {
     http.StreamedResponse res,
   ) async {
     final body = await res.stream.bytesToString();
+    print('DEBUG: API Streamed Response - Status: ${res.statusCode}');
+    print('DEBUG: API Streamed Response - Headers: ${res.headers}');
+    print('DEBUG: API Streamed Response - Body: ${body.substring(0, body.length > 500 ? 500 : body.length)}');
+    
     final data = _decodeJson<Map<String, dynamic>>(
       body,
       res.headers['content-type'],
       res.statusCode,
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return data;
+    
+    // Handle specific error cases
+    if (res.statusCode == 404) {
+      throw Exception('Endpoint not found (404) - Check server configuration or nathonly header');
+    }
+    
     throw Exception(data['error'] ?? 'HTTP ${res.statusCode}');
   }
 
   // ===== Auth ================================================================
+  // Login - TETAP PERLU nathonly header
   Future<Map<String, dynamic>> login(
     String username,
     List<double> faceEmbedding,
   ) async {
-    final res = await http
-        .post(
-          _buildUri('/login'),
-          headers: _jsonHeaders(withAuth: false),
-          // Kirim sebagai ARRAY, hindari double-encode
-          body: jsonEncode({
-            'username': username,
-            'face_embedding': faceEmbedding,
-          }),
-        )
-        .timeout(const Duration(seconds: 20));
-    return _parseResponse(res);
+    print('DEBUG: Making login request...');
+    print('DEBUG: Username: $username');
+    print('DEBUG: Face embedding length: ${faceEmbedding.length}');
+    
+    final headers = _jsonHeaders(withAuth: false);
+    print('DEBUG: Request headers: ${headers.keys}');
+    
+    final requestBody = {
+      'username': username,
+      'face_embedding': faceEmbedding,
+    };
+    
+    print('DEBUG: Request body keys: ${requestBody.keys}');
+    
+    try {
+      final res = await http
+          .post(
+            _buildUri('/login'),
+            headers: headers,
+            // Kirim sebagai ARRAY, hindari double-encode
+            body: jsonEncode(requestBody),
+          )
+          .timeout(const Duration(seconds: 20));
+      return _parseResponse(res);
+    } catch (e) {
+      print('DEBUG: Login request failed: $e');
+      rethrow;
+    }
   }
 
+  // Register - TETAP PERLU nathonly header
   Future<Map<String, dynamic>> register({
     required String username,
     required String fullName,
@@ -107,8 +154,17 @@ class ApiService {
     String? profilePhotoPath,
     String? statusMessage,
   }) async {
+    print('DEBUG: Making register request...');
+    print('DEBUG: Username: $username');
+    print('DEBUG: Full name: $fullName');
+    print('DEBUG: Face embedding length: ${faceEmbedding.length}');
+    print('DEBUG: Profile photo path: $profilePhotoPath');
+    
     final req = http.MultipartRequest('POST', _buildUri('/register'));
-    req.headers.addAll(_multipartHeaders(withAuth: false));
+    final headers = _multipartHeaders(withAuth: false);
+    req.headers.addAll(headers);
+    
+    print('DEBUG: Request headers: ${req.headers.keys}');
 
     req.fields['username'] = username;
     req.fields['full_name'] = fullName;
@@ -118,16 +174,34 @@ class ApiService {
     req.fields['face_embedding'] = jsonEncode(faceEmbedding);
     if (statusMessage != null) req.fields['status_message'] = statusMessage;
 
+    print('DEBUG: Request fields: ${req.fields.keys}');
+
     if (profilePhotoPath != null) {
-      req.files.add(
-          await http.MultipartFile.fromPath('profile_photo', profilePhotoPath));
+      try {
+        final file = File(profilePhotoPath);
+        if (await file.exists()) {
+          req.files.add(
+              await http.MultipartFile.fromPath('profile_photo', profilePhotoPath));
+          print('DEBUG: Profile photo added to request');
+        } else {
+          print('DEBUG: Profile photo file not found, skipping');
+        }
+      } catch (e) {
+        print('DEBUG: Error adding profile photo: $e');
+      }
     }
 
-    final res = await req.send().timeout(const Duration(seconds: 30));
-    return _parseStreamedResponse(res);
+    try {
+      final res = await req.send().timeout(const Duration(seconds: 30));
+      return await _parseStreamedResponse(res);
+    } catch (e) {
+      print('DEBUG: Register request failed: $e');
+      rethrow;
+    }
   }
 
   // ===== Profile & Users =====================================================
+  // Semua endpoint protected perlu nathonly header (sudah benar)
   Future<Map<String, dynamic>> getUserProfile() async {
     final res = await http
         .get(_buildUri('/profile'), headers: _jsonHeaders())
@@ -237,20 +311,37 @@ class ApiService {
   }
 
   // ⬅️ NEW: Method untuk mark messages sebagai read
-  Future<Map<String, dynamic>> markMessagesAsRead(int userId) async {
+  Future<Map<String, dynamic>> markMessagesAsRead(List<int> messageIds) async {
     try {
       final res = await http
-          .put(
+          .patch(
             _buildUri('/messages/read'),
             headers: _jsonHeaders(),
             body: jsonEncode({
-              'user_id': userId,
+              'message_ids': messageIds,
             }),
           )
           .timeout(const Duration(seconds: 20));
       return _parseResponse(res);
     } catch (e) {
       print('DEBUG: markMessagesAsRead endpoint failed: $e');
+      // Return success even if endpoint doesn't exist (graceful degradation)
+      return {'message': 'Read status updated locally'};
+    }
+  }
+
+  // Mark single message as read
+  Future<Map<String, dynamic>> markMessageAsRead(int messageId) async {
+    try {
+      final res = await http
+          .patch(
+            _buildUri('/messages/$messageId/read'),
+            headers: _jsonHeaders(),
+          )
+          .timeout(const Duration(seconds: 20));
+      return _parseResponse(res);
+    } catch (e) {
+      print('DEBUG: markMessageAsRead endpoint failed: $e');
       // Return success even if endpoint doesn't exist (graceful degradation)
       return {'message': 'Read status updated locally'};
     }

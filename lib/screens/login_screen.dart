@@ -10,7 +10,7 @@ import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 import '../controllers/auth_controller.dart';
 import '../services/face_recognition_service.dart';
 import 'register_screen.dart';
-import 'home_screen.dart';
+import 'package:rive/rive.dart' as rive;
 import 'dart:io' show Platform;
 
 class LoginScreen extends StatefulWidget {
@@ -29,10 +29,12 @@ class _LoginScreenState extends State<LoginScreen>
   // Animation Controllers
   late AnimationController _pulseController;
   late AnimationController _scanLineController;
+  late AnimationController _shimmerController;
 
   // Animations
   late Animation<double> _pulseAnimation;
   late Animation<double> _scanLineAnimation;
+  late Animation<double> _shimmerAnimation;
 
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
@@ -89,9 +91,14 @@ class _LoginScreenState extends State<LoginScreen>
       vsync: this,
     )..repeat();
 
+    _shimmerController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    )..repeat(reverse: true);
+
     _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
+      begin: 0.9,
+      end: 1.1,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,
@@ -103,6 +110,14 @@ class _LoginScreenState extends State<LoginScreen>
     ).animate(CurvedAnimation(
       parent: _scanLineController,
       curve: Curves.linear,
+    ));
+
+    _shimmerAnimation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _shimmerController,
+      curve: Curves.easeInOut,
     ));
   }
 
@@ -556,373 +571,481 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildLivenessIndicator() {
-    Color bg;
+    final colorScheme = Theme.of(context).colorScheme;
+    Color backgroundColor;
     String text;
     IconData icon;
+    Color foregroundColor = colorScheme.onSecondaryContainer;
+    
     switch (_liveness) {
       case LivenessState.blinkDetected:
-        bg = Colors.green;
-        text = 'Blink detected';
-        icon = Icons.verified;
+        backgroundColor = colorScheme.tertiaryContainer;
+        foregroundColor = colorScheme.onTertiaryContainer;
+        text = 'Blink detected!';
+        icon = Icons.verified_rounded;
         break;
       case LivenessState.processingLogin:
-        bg = Colors.orange;
-        text = 'Logging in...';
-        icon = Icons.hourglass_empty;
+        backgroundColor = colorScheme.secondaryContainer;
+        foregroundColor = colorScheme.onSecondaryContainer;
+        text = 'Authenticating...';
+        icon = Icons.hourglass_empty_rounded;
         break;
       case LivenessState.looking:
-        bg = Colors.blueGrey;
+        backgroundColor = colorScheme.primaryContainer;
+        foregroundColor = colorScheme.onPrimaryContainer;
         text = 'Blink to login';
-        icon = Icons.remove_red_eye;
+        icon = Icons.visibility_rounded;
         break;
       case LivenessState.failed:
-        bg = Colors.red;
+        backgroundColor = colorScheme.errorContainer;
+        foregroundColor = colorScheme.onErrorContainer;
         text = 'Try again';
-        icon = Icons.error_outline;
+        icon = Icons.error_outline_rounded;
         break;
       default:
-        bg = Colors.grey;
+        backgroundColor = colorScheme.surfaceContainerHigh;
+        foregroundColor = colorScheme.onSurfaceVariant;
         text = 'Idle';
-        icon = Icons.hourglass_empty;
+        icon = Icons.camera_alt_outlined;
     }
-    return Chip(
-      avatar: Icon(icon, color: Colors.white, size: 18),
-      label: Text(text, style: const TextStyle(color: Colors.white)),
-      backgroundColor: bg,
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: foregroundColor, size: 16),
+          SizedBox(width: 6),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: foregroundColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text(
-          'Auto Face Recognition Login',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.blue.shade600,
-        elevation: 0,
-        centerTitle: true,
-      ),
+      backgroundColor: colorScheme.surface,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Username
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            // Top padding for status bar
+            SizedBox(height: MediaQuery.of(context).padding.top + 20),
+            
+            // Welcome Card
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
               ),
-              child: TextField(
-                controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'Enter your username',
-                  prefixIcon:
-                      Icon(Icons.person_outline, color: Colors.blue.shade600),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        Icons.face_retouching_natural_rounded,
+                        size: 40,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Secure Face Login',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Login with just a blink using advanced biometric technology',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-                style: const TextStyle(fontSize: 16),
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Instructions Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade50, Colors.blue.shade100],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            
+            SizedBox(height: 20),
+            
+            // Username Field
+            TextField(
+              controller: _usernameController,
+              style: Theme.of(context).textTheme.bodyLarge,
+              decoration: InputDecoration(
+                labelText: 'Username',
+                hintText: 'Enter your username',
+                prefixIcon: Icon(Icons.person_outline_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            ),
+
+            SizedBox(height: 15),
+
+            InkWell(
+              onTap: _toggleCamera, // Pindahkan fungsi toggle camera ke sini
+              borderRadius: BorderRadius.circular(20),
+              child: Card(
+                elevation: 0,
+                color: _getStatusCardColor(colorScheme),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade600),
-                      const SizedBox(width: 8),
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _getStatusIconBackground(colorScheme),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _getStatusIcon(),
+                          color: _getStatusIconColor(colorScheme),
+                          size: 24,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _getStatusTitle(),
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: _getStatusTextColor(colorScheme),
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              _getStatusDescription(),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: _getStatusTextColor(colorScheme).withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      if (_isLoggingIn)
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: rive.RiveAnimation.asset(
+                            "assets/animation/face_id_animation.riv",
+                            fit: BoxFit.fitHeight,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            // SizedBox(height: 15),
+            
+            // // Instructions Card
+            // Card(
+            //   elevation: 0,
+            //   color: colorScheme.secondaryContainer,
+            //   shape: RoundedRectangleBorder(
+            //     borderRadius: BorderRadius.circular(20),
+            //   ),
+            //   child: Padding(
+            //     padding: EdgeInsets.all(20),
+            //     child: Column(
+            //       crossAxisAlignment: CrossAxisAlignment.start,
+            //       children: [
+            //         Row(
+            //           children: [
+            //             Icon(
+            //               Icons.lightbulb_outline_rounded,
+            //               color: colorScheme.onSecondaryContainer,
+            //               size: 20,
+            //             ),
+            //             SizedBox(width: 8),
+            //             Text(
+            //               'How it works',
+            //               style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            //                 fontWeight: FontWeight.bold,
+            //                 color: colorScheme.onSecondaryContainer,
+            //               ),
+            //             ),
+            //           ],
+            //         ),
+            //         SizedBox(height: 16),
+            //         _buildInstructionStep(
+            //           context,
+            //           '1',
+            //           'Enter your username above',
+            //           Icons.edit_rounded,
+            //         ),
+            //         SizedBox(height: 12),
+            //         _buildInstructionStep(
+            //           context,
+            //           '2',
+            //           'Open camera and position your face',
+            //           Icons.camera_alt_rounded,
+            //         ),
+            //         SizedBox(height: 12),
+            //         _buildInstructionStep(
+            //           context,
+            //           '3',
+            //           'Blink once to authenticate',
+            //           Icons.visibility_rounded,
+            //         ),
+            //       ],
+            //     ),
+            //   ),
+            // ),
+            
+            SizedBox(height: 15),
+            
+            // Camera Preview Card
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: _showCamera ? null : 0,
+              child: AnimatedOpacity(
+                duration: Duration(milliseconds: 300),
+                opacity: _showCamera ? 1.0 : 0.0,
+                child: Card(
+                  elevation: 0,
+                  color: colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        // Header with status
+                        Row(
+                          children: [
+                            Text(
+                              'Camera Preview',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            Spacer(),
+                            _buildLivenessIndicator(),
+                          ],
+                        ),
+                        
+                        SizedBox(height: 16),
+                        
+                        // Camera Preview
+                        Container(
+                          height: 320,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            color: colorScheme.surfaceContainer,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                if (_showCamera &&
+                                    _isCameraReady &&
+                                    _cameraController != null)
+                                  CameraPreview(_cameraController!)
+                                else if (_showCamera && !_isCameraReady)
+                                  Container(
+                                    color: Colors.black,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          CircularProgressIndicator.adaptive(
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                                colorScheme.primary),
+                                          ),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Starting camera...',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                // Face detection overlay
+                                if (_showCamera && _isCameraReady && _faceCount > 0)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: _liveness == LivenessState.blinkDetected ||
+                                                _liveness == LivenessState.processingLogin
+                                            ? colorScheme.tertiary
+                                            : colorScheme.primary,
+                                        width: 3,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+
+                                // Scanning line animation
+                                if (_showCamera &&
+                                    _isCameraReady &&
+                                    _liveness != LivenessState.blinkDetected &&
+                                    _liveness != LivenessState.processingLogin)
+                                  AnimatedBuilder(
+                                    animation: _scanLineAnimation,
+                                    builder: (context, child) {
+                                      return Positioned(
+                                        top: (1 + _scanLineAnimation.value) * 160,
+                                        left: 0,
+                                        right: 0,
+                                        child: Container(
+                                          height: 2,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                Colors.transparent,
+                                                colorScheme.primary,
+                                                Colors.transparent,
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+
+                                // Processing overlay
+                                if (_liveness == LivenessState.processingLogin)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.scrim.withOpacity(0.7),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Tambahkan spacing conditional setelah camera preview
+            if (_showCamera) SizedBox(height: 20),
+            
+            
+            // Register Button
+            // OutlinedButton.icon(
+            //   onPressed: () => Get.to(() => RegisterScreen()),
+            //   icon: Icon(Icons.person_add_rounded),
+            //   label: Text(
+            //     "Don't have an account? Register",
+            //     style: TextStyle(fontWeight: FontWeight.w600),
+            //   ),
+            // ),
+            Card(
+              elevation: 0, // Sama dengan card lain
+              color: colorScheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20), // Sama dengan card lain
+              ),
+              child: InkWell(
+                onTap: () => Get.to(() => RegisterScreen()),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.all(20), // Sama dengan padding card lain
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.person_add_rounded,
+                        color: colorScheme.onPrimary,
+                        size: 24, // Konsisten dengan icon size di card lain
+                      ),
+                      SizedBox(width: 12), // Konsisten dengan spacing di card lain
                       Text(
-                        'How to Login:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade800,
-                          fontSize: 16,
+                        'Create New Account',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold, // Konsisten dengan title style
+                          color: colorScheme.onPrimary,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '1. Enter your username\n2. Open camera\n3. Position your face\n4. Blink once to login automatically',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Debug Info Card
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Debug Info:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Faces: $_faceCount',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                  Text(
-                    _debugInfo.isEmpty ? 'Waiting...' : _debugInfo,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Camera + liveness
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            SizedBox(height: 15),
+            
+            // Security Notice
+            Card(
+              elevation: 0,
+              color: colorScheme.tertiaryContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+                padding: EdgeInsets.all(20),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Text('Auto Face Recognition',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        const Spacer(),
-                        _buildLivenessIndicator(),
-                      ],
+                    Icon(
+                      Icons.security_rounded,
+                      color: colorScheme.onTertiaryContainer,
+                      size: 20,
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      height: 280,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            if (_showCamera &&
-                                _isCameraReady &&
-                                _cameraController != null)
-                              CameraPreview(_cameraController!)
-                            else if (_showCamera && !_isCameraReady)
-                              Container(
-                                color: Colors.black,
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
-                                  ),
-                                ),
-                              )
-                            else
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Colors.blue.shade50,
-                                      Colors.blue.shade100,
-                                    ],
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      AnimatedBuilder(
-                                        animation: _pulseAnimation,
-                                        builder: (context, child) {
-                                          return Transform.scale(
-                                            scale: _pulseAnimation.value,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(20),
-                                              decoration: BoxDecoration(
-                                                color: Colors.blue.shade100,
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: Colors.blue.shade300,
-                                                  width: 2,
-                                                ),
-                                              ),
-                                              child: Icon(
-                                                Icons.camera_alt,
-                                                size: 40,
-                                                color: Colors.blue.shade600,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Press button below to open camera',
-                                        style: TextStyle(
-                                          color: Colors.blue.shade700,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                            // Face detection overlay
-                            if (_showCamera && _isCameraReady && _faceCount > 0)
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: _liveness ==
-                                                LivenessState.blinkDetected ||
-                                            _liveness ==
-                                                LivenessState.processingLogin
-                                        ? Colors.green
-                                        : Colors.orange,
-                                    width: 3,
-                                  ),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-
-                            // Scanning line animation
-                            if (_showCamera &&
-                                _isCameraReady &&
-                                _liveness != LivenessState.blinkDetected &&
-                                _liveness != LivenessState.processingLogin)
-                              AnimatedBuilder(
-                                animation: _scanLineAnimation,
-                                builder: (context, child) {
-                                  return Positioned(
-                                    top: (1 + _scanLineAnimation.value) * 140,
-                                    left: 0,
-                                    right: 0,
-                                    child: Container(
-                                      height: 2,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.transparent,
-                                            Colors.orange,
-                                            Colors.transparent,
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                            // Processing overlay
-                            if (_liveness == LivenessState.processingLogin)
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      CircularProgressIndicator(
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Processing login...',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: _toggleCamera,
-                      icon: Icon(
-                          _showCamera ? Icons.videocam_off : Icons.videocam),
-                      label: Text(_showCamera ? 'Close Camera' : 'Open Camera'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _showCamera
-                            ? Colors.red.shade500
-                            : Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 45),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Your biometric data is processed locally and securely encrypted.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onTertiaryContainer,
                         ),
                       ),
                     ),
@@ -930,131 +1053,128 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-
-            // Status Card (replaces login button)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _showCamera && _isCameraReady && !_isLoggingIn
-                      ? [Colors.green.shade50, Colors.green.shade100]
-                      : [Colors.grey.shade50, Colors.grey.shade100],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _showCamera && _isCameraReady && !_isLoggingIn
-                      ? Colors.green.shade200
-                      : Colors.grey.shade300,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _showCamera && _isCameraReady && !_isLoggingIn
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                    color: _showCamera && _isCameraReady && !_isLoggingIn
-                        ? Colors.green.shade600
-                        : Colors.grey.shade600,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _showCamera && _isCameraReady && !_isLoggingIn
-                              ? 'Ready to Login'
-                              : _isLoggingIn
-                                  ? 'Processing...'
-                                  : 'Camera Inactive',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color:
-                                _showCamera && _isCameraReady && !_isLoggingIn
-                                    ? Colors.green.shade800
-                                    : Colors.grey.shade800,
-                          ),
-                        ),
-                        Text(
-                          _showCamera && _isCameraReady && !_isLoggingIn
-                              ? 'Blink once when your face is detected to login'
-                              : _isLoggingIn
-                                  ? 'Authenticating your face...'
-                                  : 'Open camera and position your face',
-                          style: TextStyle(
-                            color:
-                                _showCamera && _isCameraReady && !_isLoggingIn
-                                    ? Colors.green.shade700
-                                    : Colors.grey.shade700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_isLoggingIn)
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.grey.shade600),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Register
-            TextButton.icon(
-              onPressed: () => Get.to(() => RegisterScreen()),
-              icon: Icon(Icons.person_add, color: Colors.blue.shade600),
-              label: Text(
-                "Don't have an account? Register",
-                style: TextStyle(
-                  color: Colors.blue.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-
-            // Security Notice
-            Container(
-              margin: const EdgeInsets.only(top: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.shield_outlined,
-                    color: Colors.blue.shade600,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Your biometric data is processed locally and securely encrypted.',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            
+            SizedBox(height: 20),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildInstructionStep(
+    BuildContext context,
+    String number,
+    String instruction,
+    IconData icon,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: colorScheme.primary,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: colorScheme.onPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 12),
+        Icon(
+          icon,
+          size: 18,
+          color: colorScheme.onSecondaryContainer.withOpacity(0.7),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            instruction,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSecondaryContainer,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getStatusCardColor(ColorScheme colorScheme) {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return colorScheme.tertiaryContainer;
+    } else if (_isLoggingIn) {
+      return colorScheme.secondaryContainer;
+    } else {
+      return colorScheme.surfaceContainerHigh;
+    }
+  }
+
+  Color _getStatusIconBackground(ColorScheme colorScheme) {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return colorScheme.tertiary;
+    } else if (_isLoggingIn) {
+      return colorScheme.secondary;
+    } else {
+      return colorScheme.surfaceContainerHighest;
+    }
+  }
+
+  IconData _getStatusIcon() {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return Icons.visibility_rounded;
+    } else if (_isLoggingIn) {
+      return Icons.hourglass_empty_rounded;
+    } else {
+      return Icons.visibility_off_rounded;
+    }
+  }
+
+  Color _getStatusIconColor(ColorScheme colorScheme) {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return colorScheme.onTertiary;
+    } else if (_isLoggingIn) {
+      return colorScheme.onSecondary;
+    } else {
+      return colorScheme.onSurfaceVariant;
+    }
+  }
+
+  Color _getStatusTextColor(ColorScheme colorScheme) {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return colorScheme.onTertiaryContainer;
+    } else if (_isLoggingIn) {
+      return colorScheme.onSecondaryContainer;
+    } else {
+      return colorScheme.onSurfaceVariant;
+    }
+  }
+
+  String _getStatusTitle() {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return 'Ready to Authenticate';
+    } else if (_isLoggingIn) {
+      return 'Processing Authentication';
+    } else {
+      return 'Camera Inactive';
+    }
+  }
+
+  String _getStatusDescription() {
+    if (_showCamera && _isCameraReady && !_isLoggingIn) {
+      return 'Position your face in the camera and blink once to login securely. Tap to close camera.';
+    } else if (_isLoggingIn) {
+      return 'Verifying your identity using advanced biometric analysis';
+    } else {
+      return 'Tap here to open camera and begin face authentication';
+    }
   }
 
   @override
@@ -1065,6 +1185,7 @@ class _LoginScreenState extends State<LoginScreen>
     _usernameController.dispose();
     _pulseController.dispose();
     _scanLineController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 }
