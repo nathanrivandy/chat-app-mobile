@@ -79,8 +79,8 @@ class ContactsTab extends StatelessWidget {
         content: SizedBox(
           width: 300,
           height: 300,
-          child: rive.RiveAnimation.asset(
-            "assets/animation/auth_teddy.riv",
+          child: rive.RiveAnimation.network(
+            "https://github.com/nathanrivandy/chat-app-mobile/raw/refs/heads/main/assets/animation/face_id_animation.riv",
             fit: BoxFit.cover,
           ),
         ),
